@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Smith Mountain Lake Directory</title>
+	<style>
+		* { margin: 0; padding: 0; box-sizing: border-box; }
+		body {
+			font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+			background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+			min-height: 100vh;
+		}
+		.header {
+			background: white;
+			padding: 20px;
+			box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+		}
+		.header h1 {
+			color: #333;
+			margin-bottom: 5px;
+		}
+		.header p {
+			color: #666;
+		}
+		.container {
+			max-width: 1400px;
+			margin: 20px auto;
+			padding: 0 20px;
+		}
+		.controls {
+			background: white;
+			padding: 20px;
+			border-radius: 10px;
+			box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+			margin-bottom: 20px;
+		}
+		.control-row {
+			display: flex;
+			gap: 10px;
+			flex-wrap: wrap;
+			margin-bottom: 10px;
+		}
+		.search-box {
+			flex: 1;
+			min-width: 250px;
+			padding: 12px;
+			border: 2px solid #ddd;
+			border-radius: 8px;
+			font-size: 16px;
+		}
+		select {
+			padding: 12px;
+			border: 2px solid #ddd;
+			border-radius: 8px;
+			font-size: 16px;
+			background: white;
+		}
+		button {
+			padding: 12px 24px;
+			border: none;
+			border-radius: 8px;
+			font-size: 16px;
+			cursor: pointer;
+			font-weight: 600;
+			transition: all 0.3s;
+		}
+		.btn-primary {
+			background: #667eea;
+			color: white;
+		}
+		.btn-primary:hover {
+			background: #5568d3;
+		}
+		.btn-secondary {
+			background: #48bb78;
+			color: white;
+		}
+		.btn-secondary:hover {
+			background: #38a169;
+		}
+		.view-toggle {
+			display: flex;
+			background: #f0f0f0;
+			border-radius: 8px;
+			padding: 4px;
+		}
+		.view-toggle button {
+			background: transparent;
+			color: #666;
+		}
+		.view-toggle button.active {
+			background: white;
+			color: #333;
+			box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+		}
+		.content {
+			background: white;
+			padding: 20px;
+			border-radius: 10px;
+			box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+		}
+		#map {
+			width: 100%;
+			height: 600px;
+			border-radius: 8px;
+		}
+		.business-grid {
+			display: grid;
+			grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+			gap: 20px;
+		}
+		.business-card {
+			border: 2px solid #e0e0e0;
+			border-radius: 10px;
+			padding: 20px;
+			transition: all 0.3s;
+		}
+		.business-card:hover {
+			box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+			transform: translateY(-2px);
+		}
+		.business-name {
+			font-size: 20px;
+			font-weight: 700;
+			color: #333;
+			margin-bottom: 8px;
+		}
+		.business-category {
+			display: inline-block;
+			padding: 4px 12px;
+			background: #667eea;
+			color: white;
+			border-radius: 20px;
+			font-size: 12px;
+			margin-bottom: 12px;
+		}
+		.business-detail {
+			margin: 8px 0;
+			color: #666;
+			font-size: 14px;
+		}
+		.business-detail strong {
+			color: #333;
+		}
+		.status-message {
+			padding: 15px;
+			border-radius: 8px;
+			margin-bottom: 20px;
+			text-align: center;
+		}
+		.status-success {
+			background: #c6f6d5;
+			color: #22543d;
+		}
+		.status-info {
+			background: #bee3f8;
+			color: #2c5282;
+		}
+		.status-error {
+			background: #fed7d7;
+			color: #742a2a;
+		}
+		.hidden { display: none; }
+	</style>
+</head>
+<body>
+	<div class="header">
+		<h1>Smith Mountain Lake Directory</h1>
+		<p>Your complete guide to businesses around the lake</p>
+	</div>
+
+	<div class="container">
+		<div class="controls">
+			<div class="control-row">
+				<input type="text" id="searchBox" class="search-box" placeholder="Search businesses...">
+				<select id="categoryFilter">
+					<option value="all">All Categories</option>
+				</select>
+				<button class="btn-secondary" onclick="importFromGoogle()">Import from Google Places</button>
+				<div class="view-toggle">
+					<button id="listViewBtn" class="active" onclick="switchView('list')">List</button>
+					<button id="mapViewBtn" onclick="switchView('map')">Map</button>
+				</div>
+			</div>
+			<div id="statusMessage"></div>
+		</div>
+
+		<div class="content">
+			<div id="listView" class="business-grid"></div>
+			<div id="mapView" class="hidden">
+				<div id="map"></div>
+			</div>
+		</div>
+	</div>
+
+	<script>
+		var API_KEY = 'AIzaSyCrj5ydDKjMGJN75Pe6sIdUyfh0dUCOMes';
+		var businesses = [];
+		var map;
+		var markers = [];
+		var currentView = 'list';
+		var categoriesSet = new Set();
+
+		function showStatus(message, type) {
+			var statusEl = document.getElementById('statusMessage');
+			statusEl.className = 'status-message status-' + type;
+			statusEl.innerHTML = message;
+			statusEl.style.display = 'block';
+			setTimeout(function() {
+				statusEl.style.display = 'none';
+			}, 5000);
+		}
+
+		function importFromGoogle() {
+			console.log('Import button clicked');
+			showStatus('Importing businesses from Google Places...', 'info');
+			
+			if (!window.google || !window.google.maps) {
+				console.log('Google Maps not loaded, loading now...');
+				loadGoogleMaps(function() {
+					console.log('Google Maps loaded successfully');
+					fetchPlaces();
+				});
+			} else {
+				console.log('Google Maps already loaded');
+				fetchPlaces();
+			}
+		}
+
+		function loadGoogleMaps(callback) {
+			console.log('loadGoogleMaps called');
+			if (document.querySelector('script[src*="maps.googleapis.com"]')) {
+				console.log('Script already exists, calling callback');
+				callback();
+				return;
+			}
+			
+			console.log('Creating new script tag with async loading');
+			var script = document.createElement('script');
+			script.src = 'https://maps.googleapis.com/maps/api/js?key=' + API_KEY + '&libraries=places,marker&loading=async&callback=onGoogleMapsLoaded';
+			script.async = true;
+			script.defer = true;
+			script.onerror = function() {
+				console.error('Failed to load Google Maps script');
+				showStatus('Failed to load Google Maps. Check API key and billing.', 'error');
+			};
+			window.onGoogleMapsLoaded = function() {
+				console.log('Google Maps callback fired');
+				callback();
+			};
+			document.head.appendChild(script);
+			console.log('Script tag added to page');
+		}
+
+		function fetchPlaces() {
+			console.log('fetchPlaces called');
+			try {
+				var mapDiv = document.createElement('div');
+				var tempMap = new google.maps.Map(mapDiv, {
+					center: {lat: 37.0389, lng: -79.5847},
+					zoom: 12
+				});
+				console.log('Temporary map created');
+				
+				var service = new google.maps.places.PlacesService(tempMap);
+				console.log('Places service created');
+				
+				var types = ['restaurant', 'lodging', 'cafe', 'store', 'tourist_attraction'];
+				var allResults = [];
+				var completed = 0;
+				
+				types.forEach(function(type) {
+					console.log('Searching for type:', type);
+					service.nearbySearch({
+						location: {lat: 37.0389, lng: -79.5847},
+						radius: 15000,
+						type: [type]
+					}, function(results, status) {
+						console.log('Type:', type, 'Status:', status, 'Results:', results ? results.length : 0);
+						
+						if (status === google.maps.places.PlacesServiceStatus.OK) {
+							results.forEach(function(place) {
+								var category = type.charAt(0).toUpperCase() + type.slice(1);
+								allResults.push({
+									id: place.place_id,
+									name: place.name,
+									category: category,
+									address: place.vicinity,
+									lat: place.geometry.location.lat(),
+									lng: place.geometry.location.lng(),
+									rating: place.rating || 'N/A'
+								});
+							});
+						} else {
+							console.error('Places API error for', type, ':', status);
+						}
+						
+						completed++;
+						console.log('Completed:', completed, 'of', types.length);
+						
+						if (completed === types.length) {
+							console.log('All searches complete. Total results:', allResults.length);
+							businesses = allResults;
+							updateCategories();
+							renderBusinesses();
+							showStatus('Successfully imported ' + businesses.length + ' businesses!', 'success');
+						}
+					});
+				});
+			} catch (error) {
+				console.error('Error in fetchPlaces:', error);
+				showStatus('Error: ' + error.message, 'error');
+			}
+		}
+
+		function updateCategories() {
+			categoriesSet.clear();
+			businesses.forEach(function(b) {
+				categoriesSet.add(b.category);
+			});
+			
+			var select = document.getElementById('categoryFilter');
+			select.innerHTML = '<option value="all">All Categories</option>';
+			Array.from(categoriesSet).sort().forEach(function(cat) {
+				var option = document.createElement('option');
+				option.value = cat;
+				option.textContent = cat;
+				select.appendChild(option);
+			});
+		}
+
+		function renderBusinesses() {
+			var searchTerm = document.getElementById('searchBox').value.toLowerCase();
+			var category = document.getElementById('categoryFilter').value;
+			
+			var filtered = businesses.filter(function(b) {
+				var matchesSearch = b.name.toLowerCase().includes(searchTerm) || 
+								   b.address.toLowerCase().includes(searchTerm);
+				var matchesCategory = category === 'all' || b.category === category;
+				return matchesSearch && matchesCategory;
+			});
+			
+			var listView = document.getElementById('listView');
+			listView.innerHTML = '';
+			
+			if (filtered.length === 0) {
+				listView.innerHTML = '<p style="text-align:center;color:#666;padding:40px;">No businesses found. Click "Import from Google Places" to load data.</p>';
+				return;
+			}
+			
+			filtered.forEach(function(business) {
+				var card = document.createElement('div');
+				card.className = 'business-card';
+				card.innerHTML = 
+					'<div class="business-name">' + business.name + '</div>' +
+					'<span class="business-category">' + business.category + '</span>' +
+					'<div class="business-detail"><strong>Address:</strong> ' + business.address + '</div>' +
+					'<div class="business-detail"><strong>Rating:</strong> ' + business.rating + '</div>';
+				listView.appendChild(card);
+			});
+		}
+
+		function switchView(view) {
+			currentView = view;
+			
+			document.getElementById('listViewBtn').classList.remove('active');
+			document.getElementById('mapViewBtn').classList.remove('active');
+			
+			if (view === 'list') {
+				document.getElementById('listViewBtn').classList.add('active');
+				document.getElementById('listView').classList.remove('hidden');
+				document.getElementById('mapView').classList.add('hidden');
+			} else {
+				document.getElementById('mapViewBtn').classList.add('active');
+				document.getElementById('listView').classList.add('hidden');
+				document.getElementById('mapView').classList.remove('hidden');
+				initMap();
+			}
+		}
+
+		function initMap() {
+			if (!window.google || !window.google.maps) {
+				loadGoogleMaps(function() {
+					createMap();
+				});
+			} else {
+				createMap();
+			}
+		}
+
+		async function createMap() {
+			if (!map) {
+				map = new google.maps.Map(document.getElementById('map'), {
+					center: {lat: 37.0389, lng: -79.5847},
+					zoom: 12
+				});
+			}
+			
+			markers.forEach(function(marker) {
+				marker.setMap(null);
+			});
+			markers = [];
+			
+			var searchTerm = document.getElementById('searchBox').value.toLowerCase();
+			var category = document.getElementById('categoryFilter').value;
+			
+			var filtered = businesses.filter(function(b) {
+				var matchesSearch = b.name.toLowerCase().includes(searchTerm) || 
+								   b.address.toLowerCase().includes(searchTerm);
+				var matchesCategory = category === 'all' || b.category === category;
+				return matchesSearch && matchesCategory;
+			});
+			
+			filtered.forEach(function(business) {
+				var marker = new google.maps.Marker({
+					position: {lat: business.lat, lng: business.lng},
+					map: map,
+					title: business.name
+				});
+				
+				var infoWindow = new google.maps.InfoWindow({
+					content: '<div style="padding:10px;"><strong>' + business.name + '</strong><br>' +
+							 business.category + '<br>' + business.address + '</div>'
+				});
+				
+				marker.addListener('click', (function(marker, infoWindow) {
+					return function() {
+						infoWindow.open(map, marker);
+					};
+				})(marker, infoWindow));
+				
+				markers.push(marker);
+			});
+		}
+
+		document.getElementById('searchBox').addEventListener('input', function() {
+			if (currentView === 'list') {
+				renderBusinesses();
+			} else {
+				createMap();
+			}
+		});
+
+		document.getElementById('categoryFilter').addEventListener('change', function() {
+			if (currentView === 'list') {
+				renderBusinesses();
+			} else {
+				createMap();
+			}
+		});
+
+		renderBusinesses();
+	</script>
+</body>
+</html>
