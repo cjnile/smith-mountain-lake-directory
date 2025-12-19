@@ -79,6 +79,10 @@
 		.btn-secondary:hover {
 			background: #38a169;
 		}
+		.btn-secondary:disabled {
+			background: #9ca3af;
+			cursor: not-allowed;
+		}
 		.view-toggle {
 			display: flex;
 			background: #f0f0f0;
@@ -146,7 +150,7 @@
 		.status-message {
 			padding: 15px;
 			border-radius: 8px;
-			margin-bottom: 20px;
+			margin-top: 10px;
 			text-align: center;
 		}
 		.status-success {
@@ -163,7 +167,6 @@
 		}
 		.hidden { display: none; }
 	</style>
-	<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCrj5ydDKjMGJN75Pe6sIdUyfh0dUCOMes&libraries=places" defer></script>
 </head>
 <body>
 	<div class="header">
@@ -178,7 +181,7 @@
 				<select id="categoryFilter">
 					<option value="all">All Categories</option>
 				</select>
-				<button class="btn-secondary" onclick="importFromGoogle()">Import from Google Places</button>
+				<button class="btn-secondary" id="importBtn" onclick="importFromGoogle()">Import from Google Places</button>
 				<div class="view-toggle">
 					<button id="listViewBtn" class="active" onclick="switchView('list')">List</button>
 					<button id="mapViewBtn" onclick="switchView('map')">Map</button>
@@ -195,11 +198,16 @@
 		</div>
 		
 		<div style="text-align:center; padding:20px; color:white; font-size:12px;">
-			Version 2.0 - Simplified Google Maps Loading
+			Version 3.0 - New Places API
 		</div>
 	</div>
 
 	<script>
+		(g=>{var h,a,k,p="The Google Maps JavaScript API",c="google",l="importLibrary",q="__ib__",m=document,b=window;b=b[c]||(b[c]={});var d=b.maps||(b.maps={}),r=new Set,e=new URLSearchParams,u=()=>h||(h=new Promise(async(f,n)=>{await (a=m.createElement("script"));e.set("libraries",[...r]+"");for(k in g)e.set(k.replace(/[A-Z]/g,t=>"_"+t[0].toLowerCase()),g[k]);e.set("callback",c+".maps."+q);a.src=`https://maps.googleapis.com/maps/api/js?`+e;d[q]=f;a.onerror=()=>h=n(Error(p+" could not load."));a.nonce=m.querySelector("script[nonce]")?.nonce||"";m.head.append(a)}));d[l]?console.warn(p+" only loads once. Ignoring:",g):d[l]=(f,...n)=>r.add(f)&&u().then(()=>d[l](f,...n))})({
+			key: "AIzaSyCrj5ydDKjMGJN75Pe6sIdUyfh0dUCOMes",
+			v: "weekly",
+		});
+
 		var businesses = [];
 		var map;
 		var markers = [];
@@ -211,89 +219,83 @@
 			statusEl.className = 'status-message status-' + type;
 			statusEl.innerHTML = message;
 			statusEl.style.display = 'block';
-			setTimeout(function() {
-				statusEl.style.display = 'none';
-			}, 5000);
 		}
 
-		function waitForGoogleMaps(callback) {
-			if (window.google && window.google.maps && window.google.maps.places) {
-				callback();
-			} else {
-				setTimeout(function() {
-					waitForGoogleMaps(callback);
-				}, 100);
-			}
-		}
-
-		function importFromGoogle() {
-			console.log('Import button clicked');
-			showStatus('Importing businesses from Google Places...', 'info');
+		async function importFromGoogle() {
+			console.log('Import started');
+			var btn = document.getElementById('importBtn');
+			btn.disabled = true;
+			btn.textContent = 'Importing...';
 			
-			waitForGoogleMaps(function() {
-				console.log('Google Maps is ready');
-				fetchPlaces();
-			});
-		}
-
-		function fetchPlaces() {
-			console.log('fetchPlaces called');
+			showStatus('Loading Google Places API...', 'info');
+			
 			try {
-				var mapDiv = document.createElement('div');
-				var tempMap = new google.maps.Map(mapDiv, {
-					center: {lat: 37.0389, lng: -79.5847},
-					zoom: 12
-				});
-				console.log('Temporary map created');
+				const { Place } = await google.maps.importLibrary("places");
+				const { Map } = await google.maps.importLibrary("maps");
 				
-				var service = new google.maps.places.PlacesService(tempMap);
-				console.log('Places service created');
+				showStatus('Searching for businesses...', 'info');
 				
-				var types = ['restaurant', 'lodging', 'cafe', 'store', 'tourist_attraction'];
-				var allResults = [];
-				var completed = 0;
+				var searchTerms = [
+					'restaurants near Smith Mountain Lake Virginia',
+					'hotels near Smith Mountain Lake Virginia',
+					'cafes near Smith Mountain Lake Virginia',
+					'shops near Smith Mountain Lake Virginia',
+					'marinas near Smith Mountain Lake Virginia'
+				];
 				
-				types.forEach(function(type) {
-					console.log('Searching for type:', type);
-					service.nearbySearch({
-						location: {lat: 37.0389, lng: -79.5847},
-						radius: 15000,
-						type: [type]
-					}, function(results, status) {
-						console.log('Type:', type, 'Status:', status, 'Results:', results ? results.length : 0);
+				var allPlaces = [];
+				
+				for (var i = 0; i < searchTerms.length; i++) {
+					var term = searchTerms[i];
+					console.log('Searching:', term);
+					
+					var request = {
+						textQuery: term,
+						fields: ['displayName', 'formattedAddress', 'location', 'rating', 'types'],
+						maxResultCount: 20
+					};
+					
+					var result = await Place.searchByText(request);
+					
+					if (result.places && result.places.length > 0) {
+						console.log('Found', result.places.length, 'places for', term);
 						
-						if (status === google.maps.places.PlacesServiceStatus.OK) {
-							results.forEach(function(place) {
-								var category = type.charAt(0).toUpperCase() + type.slice(1);
-								allResults.push({
-									id: place.place_id,
-									name: place.name,
-									category: category,
-									address: place.vicinity,
-									lat: place.geometry.location.lat(),
-									lng: place.geometry.location.lng(),
-									rating: place.rating || 'N/A'
-								});
+						result.places.forEach(function(place) {
+							var category = 'Other';
+							if (term.includes('restaurant')) category = 'Restaurant';
+							else if (term.includes('hotel')) category = 'Lodging';
+							else if (term.includes('cafe')) category = 'Cafe';
+							else if (term.includes('shop')) category = 'Store';
+							else if (term.includes('marina')) category = 'Marina';
+							
+							allPlaces.push({
+								id: place.id,
+								name: place.displayName,
+								category: category,
+								address: place.formattedAddress || 'Address not available',
+								lat: place.location.lat(),
+								lng: place.location.lng(),
+								rating: place.rating || 'N/A'
 							});
-						} else {
-							console.error('Places API error for', type, ':', status);
-						}
-						
-						completed++;
-						console.log('Completed:', completed, 'of', types.length);
-						
-						if (completed === types.length) {
-							console.log('All searches complete. Total results:', allResults.length);
-							businesses = allResults;
-							updateCategories();
-							renderBusinesses();
-							showStatus('Successfully imported ' + businesses.length + ' businesses!', 'success');
-						}
-					});
-				});
+						});
+					}
+					
+					await new Promise(resolve => setTimeout(resolve, 300));
+				}
+				
+				businesses = allPlaces;
+				updateCategories();
+				renderBusinesses();
+				showStatus('Successfully imported ' + businesses.length + ' businesses!', 'success');
+				
+				btn.disabled = false;
+				btn.textContent = 'Import from Google Places';
+				
 			} catch (error) {
-				console.error('Error in fetchPlaces:', error);
+				console.error('Import error:', error);
 				showStatus('Error: ' + error.message, 'error');
+				btn.disabled = false;
+				btn.textContent = 'Import from Google Places';
 			}
 		}
 
@@ -362,62 +364,62 @@
 			}
 		}
 
-		function initMap() {
-			waitForGoogleMaps(function() {
-				createMap();
-			});
-		}
-
-		function createMap() {
-			if (!map) {
-				map = new google.maps.Map(document.getElementById('map'), {
-					center: {lat: 37.0389, lng: -79.5847},
-					zoom: 12
+		async function initMap() {
+			try {
+				const { Map } = await google.maps.importLibrary("maps");
+				const { AdvancedMarkerElement } = await google.maps.importLibrary("marker");
+				
+				if (!map) {
+					map = new Map(document.getElementById('map'), {
+						center: {lat: 37.0389, lng: -79.5847},
+						zoom: 12,
+						mapId: 'DEMO_MAP_ID'
+					});
+				}
+				
+				markers.forEach(function(marker) {
+					marker.map = null;
 				});
-			}
-			
-			markers.forEach(function(marker) {
-				marker.setMap(null);
-			});
-			markers = [];
-			
-			var searchTerm = document.getElementById('searchBox').value.toLowerCase();
-			var category = document.getElementById('categoryFilter').value;
-			
-			var filtered = businesses.filter(function(b) {
-				var matchesSearch = b.name.toLowerCase().includes(searchTerm) || 
-								   b.address.toLowerCase().includes(searchTerm);
-				var matchesCategory = category === 'all' || b.category === category;
-				return matchesSearch && matchesCategory;
-			});
-			
-			filtered.forEach(function(business) {
-				var marker = new google.maps.Marker({
-					position: {lat: business.lat, lng: business.lng},
-					map: map,
-					title: business.name
+				markers = [];
+				
+				var searchTerm = document.getElementById('searchBox').value.toLowerCase();
+				var category = document.getElementById('categoryFilter').value;
+				
+				var filtered = businesses.filter(function(b) {
+					var matchesSearch = b.name.toLowerCase().includes(searchTerm) || 
+									   b.address.toLowerCase().includes(searchTerm);
+					var matchesCategory = category === 'all' || b.category === category;
+					return matchesSearch && matchesCategory;
 				});
 				
-				var infoWindow = new google.maps.InfoWindow({
-					content: '<div style="padding:10px;"><strong>' + business.name + '</strong><br>' +
-							 business.category + '<br>' + business.address + '</div>'
-				});
-				
-				marker.addListener('click', (function(marker, infoWindow) {
-					return function() {
+				filtered.forEach(function(business) {
+					var marker = new google.maps.Marker({
+						position: {lat: business.lat, lng: business.lng},
+						map: map,
+						title: business.name
+					});
+					
+					var infoWindow = new google.maps.InfoWindow({
+						content: '<div style="padding:10px;"><strong>' + business.name + '</strong><br>' +
+								 business.category + '<br>' + business.address + '<br>Rating: ' + business.rating + '</div>'
+					});
+					
+					marker.addListener('click', function() {
 						infoWindow.open(map, marker);
-					};
-				})(marker, infoWindow));
-				
-				markers.push(marker);
-			});
+					});
+					
+					markers.push(marker);
+				});
+			} catch (error) {
+				console.error('Map error:', error);
+			}
 		}
 
 		document.getElementById('searchBox').addEventListener('input', function() {
 			if (currentView === 'list') {
 				renderBusinesses();
 			} else {
-				createMap();
+				initMap();
 			}
 		});
 
@@ -425,7 +427,7 @@
 			if (currentView === 'list') {
 				renderBusinesses();
 			} else {
-				createMap();
+				initMap();
 			}
 		});
 
