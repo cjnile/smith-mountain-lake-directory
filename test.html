@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Simple Test</title>
+</head>
+<body>
+	<h1>Google Maps Test</h1>
+	<button onclick="testAPI()">Test API</button>
+	<div id="result"></div>
+	<div id="map" style="height:400px;width:100%;margin-top:20px;"></div>
+	
+	<script>
+		function testAPI() {
+			document.getElementById('result').innerHTML = 'Loading...';
+			
+			var script = document.createElement('script');
+			script.src = 'https://maps.googleapis.com/maps/api/js?key=AIzaSyCrj5ydDKjMGJN75Pe6sIdUyfh0dUCOMes&libraries=places&callback=initMap';
+			document.head.appendChild(script);
+		}
+		
+		function initMap() {
+			var map = new google.maps.Map(document.getElementById('map'), {
+				center: {lat: 37.0389, lng: -79.5847},
+				zoom: 12
+			});
+			
+			var service = new google.maps.places.PlacesService(map);
+			service.nearbySearch({
+				location: {lat: 37.0389, lng: -79.5847},
+				radius: 5000,
+				type: ['restaurant']
+			}, function(results, status) {
+				if (status === 'OK') {
+					document.getElementById('result').innerHTML = 'SUCCESS! Found ' + results.length + ' restaurants';
+				} else {
+					document.getElementById('result').innerHTML = 'ERROR: ' + status;
+				}
+			});
+		}
+	</script>
+</body>
+</html>
