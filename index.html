@@ -207,7 +207,7 @@
 		</div>
 		
 		<div style="text-align:center; padding:20px; color:white; font-size:12px;">
-			Version 4.1 - Supabase Database (Fixed)
+			Version 4.2 - Added Phone Numbers
 		</div>
 	</div>
 
@@ -311,7 +311,7 @@
 					
 					var request = {
 						textQuery: term,
-						fields: ['displayName', 'formattedAddress', 'location', 'rating', 'types'],
+						fields: ['displayName', 'formattedAddress', 'location', 'rating', 'types', 'nationalPhoneNumber'],
 						maxResultCount: 20
 					};
 					
@@ -334,7 +334,8 @@
 								address: place.formattedAddress || 'Address not available',
 								lat: place.location.lat(),
 								lng: place.location.lng(),
-								rating: place.rating ? place.rating.toString() : 'N/A'
+								rating: place.rating ? place.rating.toString() : 'N/A',
+							phone: place.nationalPhoneNumber || 'Not available'
 							});
 						});
 					}
@@ -404,7 +405,8 @@
 					'<div class="business-name">' + business.name + '</div>' +
 					'<span class="business-category">' + business.category + '</span>' +
 					'<div class="business-detail"><strong>Address:</strong> ' + business.address + '</div>' +
-					'<div class="business-detail"><strong>Rating:</strong> ' + business.rating + '</div>';
+					'<div class="business-detail"><strong>Phone:</strong> ' + (business.phone || 'Not available') + '</div>' +
+				'<div class="business-detail"><strong>Rating:</strong> ' + business.rating + '</div>';
 				listView.appendChild(card);
 			});
 		}
@@ -463,7 +465,7 @@
 					
 					var infoWindow = new google.maps.InfoWindow({
 						content: '<div style="padding:10px;"><strong>' + business.name + '</strong><br>' +
-								 business.category + '<br>' + business.address + '<br>Rating: ' + business.rating + '</div>'
+								 business.category + '<br>' + business.address + '<br>Phone: ' + (business.phone || 'Not available') + '<br>Rating: ' + business.rating + '</div>'
 					});
 					
 					marker.addListener('click', function() {
