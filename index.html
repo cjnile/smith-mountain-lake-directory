@@ -207,7 +207,7 @@
 		</div>
 		
 		<div style="text-align:center; padding:20px; color:white; font-size:12px;">
-			Version 4.0 - Supabase Database
+			Version 4.1 - Supabase Database (Fixed)
 		</div>
 	</div>
 
@@ -215,7 +215,7 @@
 		// Initialize Supabase
 		const SUPABASE_URL = 'https://oykvpzpdilajdonbvyop.supabase.co';
 		const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95a3ZwenBkaWxhamRvbmJ2eW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYyMjA5NTMsImV4cCI6MjA4MTc5Njk1M30.Evz4X768qqCk9T73BBw5Y77KxbhlZx-UAd5F4gEm3nY';
-		const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+		const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 		// Google Maps loader
 		(g=>{var h,a,k,p="The Google Maps JavaScript API",c="google",l="importLibrary",q="__ib__",m=document,b=window;b=b[c]||(b[c]={});var d=b.maps||(b.maps={}),r=new Set,e=new URLSearchParams,u=()=>h||(h=new Promise(async(f,n)=>{await (a=m.createElement("script"));e.set("libraries",[...r]+"");for(k in g)e.set(k.replace(/[A-Z]/g,t=>"_"+t[0].toLowerCase()),g[k]);e.set("callback",c+".maps."+q);a.src=`https://maps.googleapis.com/maps/api/js?`+e;d[q]=f;a.onerror=()=>h=n(Error(p+" could not load."));a.nonce=m.querySelector("script[nonce]")?.nonce||"";m.head.append(a)}));d[l]?console.warn(p+" only loads once. Ignoring:",g):d[l]=(f,...n)=>r.add(f)&&u().then(()=>d[l](f,...n))})({
@@ -234,7 +234,7 @@
 			try {
 				showStatus('Loading businesses from database...', 'info');
 				
-				const { data, error } = await supabase
+				const { data, error } = await sbClient
 					.from('businesses')
 					.select('*')
 					.order('name');
@@ -259,7 +259,7 @@
 		// Save businesses to Supabase
 		async function saveBusinessesToDB(newBusinesses) {
 			try {
-				const { data, error } = await supabase
+				const { data, error } = await sbClient
 					.from('businesses')
 					.insert(newBusinesses);
 				
@@ -482,7 +482,7 @@
 				try {
 					showStatus('Deleting all businesses...', 'info');
 					
-					const { error } = await supabase
+					const { error } = await sbClient
 						.from('businesses')
 						.delete()
 						.neq('id', 0);
