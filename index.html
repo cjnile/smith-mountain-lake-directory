@@ -155,6 +155,19 @@
 		.business-detail strong {
 			color: #333;
 		}
+		.business-image {
+			width: 100%;
+			height: 200px;
+			object-fit: cover;
+			border-radius: 8px;
+			margin-bottom: 12px;
+		}
+		.business-description {
+			margin: 12px 0;
+			color: #555;
+			font-size: 14px;
+			line-height: 1.5;
+		}
 		.status-message {
 			padding: 15px;
 			border-radius: 8px;
@@ -207,7 +220,7 @@
 		</div>
 		
 		<div style="text-align:center; padding:20px; color:white; font-size:12px;">
-			Version 4.2 - Added Phone Numbers
+			Version 4.3 - Added Descriptions and Images
 		</div>
 	</div>
 
@@ -311,7 +324,7 @@
 					
 					var request = {
 						textQuery: term,
-						fields: ['displayName', 'formattedAddress', 'location', 'rating', 'types', 'nationalPhoneNumber'],
+						fields: ['displayName', 'formattedAddress', 'location', 'rating', 'types', 'nationalPhoneNumber', 'editorialSummary', 'photos'],
 						maxResultCount: 20
 					};
 					
@@ -335,7 +348,9 @@
 								lat: place.location.lat(),
 								lng: place.location.lng(),
 								rating: place.rating ? place.rating.toString() : 'N/A',
-							phone: place.nationalPhoneNumber || 'Not available'
+							phone: place.nationalPhoneNumber || 'Not available',
+							description: place.editorialSummary || '',
+							imageUrl: (place.photos && place.photos.length > 0) ? place.photos[0].getURI({maxWidth: 400, maxHeight: 300}) : ''
 							});
 						});
 					}
@@ -401,9 +416,14 @@
 			filtered.forEach(function(business) {
 				var card = document.createElement('div');
 				card.className = 'business-card';
-				card.innerHTML = 
+				var imageHtml = business.imageUrl ? '<img src="' + business.imageUrl + '" class="business-image" alt="' + business.name + '">' : '';
+			var descriptionHtml = business.description ? '<div class="business-description">' + business.description + '</div>' : '';
+
+			card.innerHTML =
+				imageHtml +
 					'<div class="business-name">' + business.name + '</div>' +
 					'<span class="business-category">' + business.category + '</span>' +
+					descriptionHtml +
 					'<div class="business-detail"><strong>Address:</strong> ' + business.address + '</div>' +
 					'<div class="business-detail"><strong>Phone:</strong> ' + (business.phone || 'Not available') + '</div>' +
 				'<div class="business-detail"><strong>Rating:</strong> ' + business.rating + '</div>';
@@ -464,8 +484,8 @@
 					});
 					
 					var infoWindow = new google.maps.InfoWindow({
-						content: '<div style="padding:10px;"><strong>' + business.name + '</strong><br>' +
-								 business.category + '<br>' + business.address + '<br>Phone: ' + (business.phone || 'Not available') + '<br>Rating: ' + business.rating + '</div>'
+						content: '<div style="padding:10px;max-width:250px;"><strong>' + business.name + '</strong><br>' +
+								 business.category + (business.description ? '<br>' + business.description : '') + '<br>' + business.address + '<br>Phone: ' + (business.phone || 'Not available') + '<br>Rating: ' + business.rating + '</div>'
 					});
 					
 					marker.addListener('click', function() {
