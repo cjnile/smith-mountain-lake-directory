@@ -4,6 +4,7 @@
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<title>Smith Mountain Lake Directory</title>
+	<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 	<style>
 		* { margin: 0; padding: 0; box-sizing: border-box; }
 		body {
@@ -79,7 +80,14 @@
 		.btn-secondary:hover {
 			background: #38a169;
 		}
-		.btn-secondary:disabled {
+		.btn-danger {
+			background: #f56565;
+			color: white;
+		}
+		.btn-danger:hover {
+			background: #e53e3e;
+		}
+		.btn-secondary:disabled, .btn-primary:disabled, .btn-danger:disabled {
 			background: #9ca3af;
 			cursor: not-allowed;
 		}
@@ -182,6 +190,7 @@
 					<option value="all">All Categories</option>
 				</select>
 				<button class="btn-secondary" id="importBtn" onclick="importFromGoogle()">Import from Google Places</button>
+				<button class="btn-danger" onclick="clearData()">Clear All Data</button>
 				<div class="view-toggle">
 					<button id="listViewBtn" class="active" onclick="switchView('list')">List</button>
 					<button id="mapViewBtn" onclick="switchView('map')">Map</button>
@@ -198,11 +207,17 @@
 		</div>
 		
 		<div style="text-align:center; padding:20px; color:white; font-size:12px;">
-			Version 3.0 - New Places API
+			Version 4.0 - Supabase Database
 		</div>
 	</div>
 
 	<script>
+		// Initialize Supabase
+		const SUPABASE_URL = 'https://oykvpzpdilajdonbvyop.supabase.co';
+		const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95a3ZwenBkaWxhamRvbmJ2eW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYyMjA5NTMsImV4cCI6MjA4MTc5Njk1M30.Evz4X768qqCk9T73BBw5Y77KxbhlZx-UAd5F4gEm3nY';
+		const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+		// Google Maps loader
 		(g=>{var h,a,k,p="The Google Maps JavaScript API",c="google",l="importLibrary",q="__ib__",m=document,b=window;b=b[c]||(b[c]={});var d=b.maps||(b.maps={}),r=new Set,e=new URLSearchParams,u=()=>h||(h=new Promise(async(f,n)=>{await (a=m.createElement("script"));e.set("libraries",[...r]+"");for(k in g)e.set(k.replace(/[A-Z]/g,t=>"_"+t[0].toLowerCase()),g[k]);e.set("callback",c+".maps."+q);a.src=`https://maps.googleapis.com/maps/api/js?`+e;d[q]=f;a.onerror=()=>h=n(Error(p+" could not load."));a.nonce=m.querySelector("script[nonce]")?.nonce||"";m.head.append(a)}));d[l]?console.warn(p+" only loads once. Ignoring:",g):d[l]=(f,...n)=>r.add(f)&&u().then(()=>d[l](f,...n))})({
 			key: "AIzaSyCrj5ydDKjMGJN75Pe6sIdUyfh0dUCOMes",
 			v: "weekly",
@@ -213,6 +228,51 @@
 		var markers = [];
 		var currentView = 'list';
 		var categoriesSet = new Set();
+		
+		// Load businesses from Supabase
+		async function loadBusinessesFromDB() {
+			try {
+				showStatus('Loading businesses from database...', 'info');
+				
+				const { data, error } = await supabase
+					.from('businesses')
+					.select('*')
+					.order('name');
+				
+				if (error) throw error;
+				
+				if (data && data.length > 0) {
+					businesses = data;
+					updateCategories();
+					renderBusinesses();
+					showStatus('Loaded ' + businesses.length + ' businesses from database', 'success');
+				} else {
+					showStatus('No businesses found. Click "Import from Google Places" to populate the directory.', 'info');
+					renderBusinesses();
+				}
+			} catch (error) {
+				console.error('Error loading businesses:', error);
+				showStatus('Error loading businesses: ' + error.message, 'error');
+			}
+		}
+		
+		// Save businesses to Supabase
+		async function saveBusinessesToDB(newBusinesses) {
+			try {
+				const { data, error } = await supabase
+					.from('businesses')
+					.insert(newBusinesses);
+				
+				if (error) throw error;
+				
+				console.log('Saved', newBusinesses.length, 'businesses to database');
+				return true;
+			} catch (error) {
+				console.error('Error saving businesses:', error);
+				showStatus('Error saving businesses: ' + error.message, 'error');
+				return false;
+			}
+		}
 
 		function showStatus(message, type) {
 			var statusEl = document.getElementById('statusMessage');
@@ -269,13 +329,12 @@
 							else if (term.includes('marina')) category = 'Marina';
 							
 							allPlaces.push({
-								id: place.id,
 								name: place.displayName,
 								category: category,
 								address: place.formattedAddress || 'Address not available',
 								lat: place.location.lat(),
 								lng: place.location.lng(),
-								rating: place.rating || 'N/A'
+								rating: place.rating ? place.rating.toString() : 'N/A'
 							});
 						});
 					}
@@ -283,10 +342,14 @@
 					await new Promise(resolve => setTimeout(resolve, 300));
 				}
 				
-				businesses = allPlaces;
-				updateCategories();
-				renderBusinesses();
-				showStatus('Successfully imported ' + businesses.length + ' businesses!', 'success');
+				showStatus('Saving ' + allPlaces.length + ' businesses to database...', 'info');
+				
+				var saved = await saveBusinessesToDB(allPlaces);
+				
+				if (saved) {
+					await loadBusinessesFromDB();
+					showStatus('Successfully imported and saved ' + allPlaces.length + ' businesses!', 'success');
+				}
 				
 				btn.disabled = false;
 				btn.textContent = 'Import from Google Places';
@@ -367,7 +430,6 @@
 		async function initMap() {
 			try {
 				const { Map } = await google.maps.importLibrary("maps");
-				const { AdvancedMarkerElement } = await google.maps.importLibrary("marker");
 				
 				if (!map) {
 					map = new Map(document.getElementById('map'), {
@@ -415,6 +477,29 @@
 			}
 		}
 
+		async function clearData() {
+			if (confirm('Are you sure you want to delete all ' + businesses.length + ' businesses from the database? This cannot be undone.')) {
+				try {
+					showStatus('Deleting all businesses...', 'info');
+					
+					const { error } = await supabase
+						.from('businesses')
+						.delete()
+						.neq('id', 0);
+					
+					if (error) throw error;
+					
+					businesses = [];
+					updateCategories();
+					renderBusinesses();
+					showStatus('All data cleared from database', 'success');
+				} catch (error) {
+					console.error('Error clearing data:', error);
+					showStatus('Error clearing data: ' + error.message, 'error');
+				}
+			}
+		}
+
 		document.getElementById('searchBox').addEventListener('input', function() {
 			if (currentView === 'list') {
 				renderBusinesses();
@@ -431,7 +516,8 @@
 			}
 		});
 
-		renderBusinesses();
+		// Load businesses on page load
+		loadBusinessesFromDB();
 	</script>
 </body>
 </html>
